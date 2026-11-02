@@ -1,0 +1,21 @@
+# 密钥与本地数据
+.env
+backend/data/
+backend/*.db
+backend/uploads/
+volumes/
+
+# 依赖与构建产物
+backend/vendor/
+backend/bin/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# 工具与测试产物
+.playwright-mcp/
+.claude/
+
+# 系统
+.DS_Store
+Thumbs.db
