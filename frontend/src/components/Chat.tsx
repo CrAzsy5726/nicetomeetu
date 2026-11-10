@@ -5,6 +5,7 @@ import { avatarMasked, displayName, displayTagline, revealLevel } from '../revea
 import { useApp } from '../store'
 import Markdown from './Markdown'
 import PersonaAvatar from './PersonaAvatar'
+import ThemeSwitcher from './ThemeSwitcher'
 
 const EMOJIS = [
   '😀', '😄', '😂', '🤣', '😊', '😍', '😘', '😎', '🤔', '😅',
@@ -22,17 +23,24 @@ export default function Chat() {
   const [showEmoji, setShowEmoji] = useState(false)
   const [quoteText, setQuoteText] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; content: string } | null>(null)
+  const [swiped, setSwiped] = useState<number | null>(null)
+  const [drag, setDrag] = useState<{ id: number; x: number } | null>(null)
   const endRef = useRef<HTMLDivElement>(null)
   const taRef = useRef<HTMLTextAreaElement>(null)
   const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+  const dragXRef = useRef(0)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streaming])
 
-  // 点击任意处关闭右键菜单
+  // 点击任意处关闭右键菜单与左滑菜单
   useEffect(() => {
-    const close = () => setMenu(null)
+    const close = () => {
+      setMenu(null)
+      setSwiped(null)
+    }
     document.addEventListener('click', close)
     return () => document.removeEventListener('click', close)
   }, [])
@@ -50,6 +58,7 @@ export default function Chat() {
   const doQuote = (content: string) => {
     setQuoteText(content)
     setMenu(null)
+    setSwiped(null)
   }
 
   const doCopy = async (content: string) => {
@@ -59,6 +68,7 @@ export default function Chat() {
       /* ignore */
     }
     setMenu(null)
+    setSwiped(null)
   }
 
   const submit = () => {
@@ -101,6 +111,7 @@ export default function Chat() {
           </div>
         </div>
         <div className="chat-actions">
+          <ThemeSwitcher direction="down" />
           <button
             className="chat-action"
             onClick={() => {
@@ -122,6 +133,73 @@ export default function Chat() {
       <div className="messages">
         {messages.map((m, i) => {
           const isAssistantWithContent = m.role === 'assistant' && m.content !== ''
+          const tx = swiped === i ? -120 : drag?.id === i ? drag.x : 0
+          const bubble = (
+            <div
+              className={`bubble ${m.role === 'assistant' && m.content === '' ? 'empty' : ''}`}
+              onContextMenu={
+                isAssistantWithContent
+                  ? (e) => {
+                      e.preventDefault()
+                      showMenu(e.clientX, e.clientY, m.content)
+                    }
+                  : undefined
+              }
+              onTouchStart={
+                isAssistantWithContent
+                  ? (e) => {
+                      touchStartX.current = e.touches[0].clientX
+                      touchStartY.current = e.touches[0].clientY
+                      dragXRef.current = swiped === i ? -120 : 0
+                      setDrag({ id: i, x: dragXRef.current })
+                    }
+                  : undefined
+              }
+              onTouchMove={
+                isAssistantWithContent
+                  ? (e) => {
+                      if (touchStartX.current === null) return
+                      const dx = e.touches[0].clientX - touchStartX.current
+                      const dy = e.touches[0].clientY - touchStartY.current!
+                      if (Math.abs(dx) <= Math.abs(dy)) return
+                      const base = swiped === i ? -120 : 0
+                      const x = Math.max(-120, Math.min(0, base + dx))
+                      dragXRef.current = x
+                      setDrag({ id: i, x })
+                    }
+                  : undefined
+              }
+              onTouchEnd={
+                isAssistantWithContent
+                  ? () => {
+                      if (dragXRef.current < -60) setSwiped(i)
+                      else setSwiped(null)
+                      setDrag(null)
+                      dragXRef.current = 0
+                      touchStartX.current = null
+                      touchStartY.current = null
+                    }
+                  : undefined
+              }
+              style={tx !== 0 ? { transform: `translateX(${tx}px)` } : undefined}
+            >
+              {m.role === 'assistant' && m.content === '' ? (
+                <span className="typing">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              ) : m.role === 'assistant' ? (
+                <Markdown text={m.content} />
+              ) : (
+                <>
+                  {m.quote && <div className="message-quote">{m.quote}</div>}
+                  {m.content}
+                </>
+              )}
+            </div>
+          )
+
           return (
             <div key={i} className={`message message--${m.role}`}>
               {m.role === 'assistant' && (
@@ -129,51 +207,21 @@ export default function Chat() {
                   <PersonaAvatar persona={persona} masked={avatarHidden} />
                 </div>
               )}
-              <div
-                className={`bubble ${m.role === 'assistant' && m.content === '' ? 'empty' : ''}`}
-                onContextMenu={
-                  isAssistantWithContent
-                    ? (e) => {
-                        e.preventDefault()
-                        showMenu(e.clientX, e.clientY, m.content)
-                      }
-                    : undefined
-                }
-                onTouchStart={
-                  isAssistantWithContent
-                    ? (e) => {
-                        touchStartX.current = e.touches[0].clientX
-                      }
-                    : undefined
-                }
-                onTouchEnd={
-                  isAssistantWithContent
-                    ? (e) => {
-                        if (touchStartX.current === null) return
-                        const dx = e.changedTouches[0].clientX - touchStartX.current
-                        touchStartX.current = null
-                        if (dx < -40) {
-                          showMenu(e.changedTouches[0].clientX, e.changedTouches[0].clientY, m.content)
-                        }
-                      }
-                    : undefined
-                }
-              >
-                {m.role === 'assistant' && m.content === '' ? (
-                  <span className="typing">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                ) : m.role === 'assistant' ? (
-                  <Markdown text={m.content} />
-                ) : (
-                  <>
-                    {m.quote && <div className="message-quote">{m.quote}</div>}
-                    {m.content}
-                  </>
-                )}
-              </div>
+              {isAssistantWithContent ? (
+                <div className="message-swipe">
+                  <div className="swipe-actions">
+                    <button className="swipe-action swipe-action--quote" onClick={() => doQuote(m.content)}>
+                      引用
+                    </button>
+                    <button className="swipe-action swipe-action--copy" onClick={() => doCopy(m.content)}>
+                      复制
+                    </button>
+                  </div>
+                  {bubble}
+                </div>
+              ) : (
+                bubble
+              )}
             </div>
           )
         })}

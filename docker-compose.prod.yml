@@ -1,0 +1,110 @@
+# NiceToMeetU 生产部署（2核2G 内存限制版）
+# 用法：在项目根目录执行
+#   cp .env.production.example .env   # 填入 API 密钥
+#   docker compose -f docker-compose.prod.yml up -d --build
+
+services:
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.14
+    container_name: ntmu-etcd
+    restart: unless-stopped
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    volumes:
+      - etcd_data:/etcd
+    mem_limit: 128m
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    container_name: ntmu-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: minio server /minio_data --console-address ":9001"
+    volumes:
+      - minio_data:/minio_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    mem_limit: 128m
+
+  milvus:
+    image: milvusdb/milvus:v2.4.17
+    container_name: ntmu-milvus
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    volumes:
+      - milvus_data:/var/lib/milvus
+    depends_on:
+      - etcd
+      - minio
+    mem_limit: 768m
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: ntmu-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ntmu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ntmupass}
+      POSTGRES_DB: ntmu
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ntmu -d ntmu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+
+  backend:
+    build: ./backend
+    container_name: ntmu-backend
+    restart: unless-stopped
+    environment:
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      ZHIPU_API_KEY: ${ZHIPU_API_KEY}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-chat}
+      ZHIPU_BASE_URL: ${ZHIPU_BASE_URL:-https://open.bigmodel.cn/api/paas/v4}
+      ZHIPU_MODEL: ${ZHIPU_MODEL:-embedding-3}
+      EMBED_DIM: ${EMBED_DIM:-1024}
+      MILVUS_ADDR: milvus:19530
+      MILVUS_COLLECTION: user_profiles
+      DATABASE_URL: postgres://ntmu:${POSTGRES_PASSWORD:-ntmupass}@postgres:5432/ntmu
+      SERVER_ADDR: :8080
+      EXTRACT_WORKERS: ${EXTRACT_WORKERS:-4}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      milvus:
+        condition: service_started
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: ntmu-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  etcd_data:
+  minio_data:
+  milvus_data:
+  pg_data:
+  uploads_data:

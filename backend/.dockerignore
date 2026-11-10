@@ -1,0 +1,6 @@
+bin/
+data/
+uploads/
+.env
+*.db
+*.exe

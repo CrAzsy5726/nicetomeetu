@@ -19,3 +19,7 @@ frontend/dist/
 # 系统
 .DS_Store
 Thumbs.db
+
+# 个人文档（仅本地保留，不推送到仓库）
+MY_ROLE.md
+PROJECT_INTRO.md

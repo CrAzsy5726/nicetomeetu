@@ -10,10 +10,19 @@ import CustomPersonaForm from './CustomPersonaForm'
 import ThemeSwitcher from './ThemeSwitcher'
 
 export default function Companion() {
-  const { authenticated, persona, personas, selectCompanion, selectBlindBox, refreshPersonas } =
-    useApp()
+  const {
+    authenticated,
+    persona,
+    personas,
+    selectCompanion,
+    selectBlindBox,
+    refreshPersonas,
+    username,
+    logout,
+  } = useApp()
   const navigate = useNavigate()
   const [showCustom, setShowCustom] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Persona | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -73,7 +82,12 @@ export default function Companion() {
 
       <div className="persona-grid">
         {personas.map((p) => (
-          <div className="persona-card" key={p.id} style={{ '--card-accent': p.accent } as CSSProperties}>
+          <div
+            className="persona-card"
+            key={p.id}
+            style={{ '--card-accent': p.accent } as CSSProperties}
+            onClick={() => pick(p.id)}
+          >
             {isDeletable(p.id) && (
               <button
                 className="persona-delete"
@@ -97,9 +111,9 @@ export default function Companion() {
             <div className="persona-tagline" style={{ color: p.accent }}>
               {p.hidden ? '神秘人' : p.tagline}
             </div>
-            <button className="persona-pick" onClick={() => pick(p.id)}>
+            <div className="persona-pick">
               {p.hidden ? '再次相遇' : `认识 ${p.name}`}
-            </button>
+            </div>
           </div>
         ))}
 
@@ -137,6 +151,31 @@ export default function Companion() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      <div className="profile-corner">
+        {profileOpen && (
+          <div className="profile-menu">
+            <div className="profile-menu-user">👤 {username}</div>
+            <button
+              className="profile-menu-item"
+              onClick={() => {
+                logout()
+                navigate('/')
+              }}
+            >
+              换账号
+            </button>
+          </div>
+        )}
+        <button
+          className="profile-trigger"
+          onClick={() => setProfileOpen((o) => !o)}
+          aria-label="个人中心"
+          title="个人中心"
+        >
+          {username.charAt(0).toUpperCase()}
+        </button>
+      </div>
     </div>
   )
 }

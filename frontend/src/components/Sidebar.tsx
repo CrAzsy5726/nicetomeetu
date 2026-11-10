@@ -1,6 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useApp } from '../store'
-import ThemeSwitcher from './ThemeSwitcher'
 
 export default function Sidebar() {
   const { username, logout } = useApp()
@@ -31,9 +30,6 @@ export default function Sidebar() {
           >
             换账号
           </button>
-        </div>
-        <div className="side-themes" role="group" aria-label="主题切换">
-          <ThemeSwitcher direction="up" />
         </div>
       </div>
     </aside>

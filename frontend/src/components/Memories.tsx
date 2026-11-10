@@ -4,6 +4,7 @@ import { useApp } from '../store'
 import Achievements from './Achievements'
 import DiaryPanel from './DiaryPanel'
 import MemoryPanel from './MemoryPanel'
+import ThemeSwitcher from './ThemeSwitcher'
 
 type Tab = 'facts' | 'diary' | 'achievements'
 
@@ -16,15 +17,18 @@ export default function Memories() {
     <div className="memories">
       <div className="memories-account">
         <span className="memories-account-user">👤 {username}</span>
-        <button
-          className="memories-account-logout"
-          onClick={() => {
-            logout()
-            navigate('/')
-          }}
-        >
-          换账号
-        </button>
+        <div className="memories-account-actions">
+          <ThemeSwitcher direction="down" />
+          <button
+            className="memories-account-logout"
+            onClick={() => {
+              logout()
+              navigate('/')
+            }}
+          >
+            换账号
+          </button>
+        </div>
       </div>
       <div className="memories-tabs">
         <button className={`tab ${tab === 'facts' ? 'active' : ''}`} onClick={() => setTab('facts')}>
